@@ -1,0 +1,34 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-04-15T11:00:00+00:00",
+    "name": "WebApp (Static + Node.js)",
+    "author": "k2boss@propkill.eu",
+    "description": "Tout-en-un : sert un site statique depuis public/ ET supporte des routes API Node.js via routes.js (optionnel). Ideal pour un site avec un backend simple. Express preinstalle, dependances additionnelles auto-installees si tu modifies package.json.",
+    "features": [
+        "nodejs"
+    ],
+    "docker_images": {
+        "Node.js 22": "ghcr.io/parkervcp/yolks:nodejs_22",
+        "Node.js 20": "ghcr.io/parkervcp/yolks:nodejs_20"
+    },
+    "file_denylist": [],
+    "startup": "bash /home/container/start.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\r\n    \"done\": \"[WebApp] Demarrage\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\nset -e\nmkdir -p /mnt/server/public\n\n# server.js - serveur Express tout-en-un (statique + API si presente)\ncat > /mnt/server/server.js << 'SERVEREOF'\nconst express = require('express');\nconst path = require('path');\nconst fs = require('fs');\n\nconst app = express();\nconst port = process.env.SERVER_PORT || 3000;\nconst publicDir = path.join(__dirname, 'public');\nconst routesFile = path.join(__dirname, 'routes.js');\n\napp.use(express.json());\napp.use(express.urlencoded({ extended: true }));\n\n// Charge les routes API custom si routes.js existe\nif (fs.existsSync(routesFile)) {\n    try {\n        const customRoutes = require('./routes.js');\n        app.use('/api', customRoutes);\n        console.log('[INFO] routes.js charge sur /api');\n    } catch (err) {\n        console.error('[ERREUR] routes.js invalide:', err.message);\n    }\n} else {\n    console.log('[INFO] Pas de routes.js - mode site statique seul');\n}\n\n// Cree public/ si vide\nif (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir);\nif (fs.readdirSync(publicDir).length === 0) {\n    fs.writeFileSync(path.join(publicDir, 'index.html'),\n        '<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>WebApp</title>' +\n        '<style>body{font-family:sans-serif;background:#1a1a2e;color:#eee;text-align:center;padding:80px}' +\n        'h1{color:#00ff88}code{background:#16213e;padding:4px 10px;border-radius:4px;color:#00ff88}</style></head>' +\n        '<body><h1>WebApp - Pret</h1>' +\n        '<p>Depose ton site dans <code>public/</code></p>' +\n        '<p>Pour des routes API, cree <code>routes.js</code></p></body></html>'\n    );\n}\n\n// Sert le site statique\napp.use(express.static(publicDir));\n\n// Fallback SPA (pour React/Vue routing)\napp.get('*', (req, res) => {\n    const indexFile = path.join(publicDir, 'index.html');\n    if (fs.existsSync(indexFile)) res.sendFile(indexFile);\n    else res.status(404).send('Not found');\n});\n\napp.listen(port, '0.0.0.0', () => {\n    console.log('[WebApp] Demarrage sur le port ' + port);\n});\nSERVEREOF\n\n# package.json par defaut avec Express\ncat > /mnt/server/package.json << 'PKGEOF'\n{\n  \"name\": \"webapp\",\n  \"version\": \"1.0.0\",\n  \"main\": \"server.js\",\n  \"dependencies\": {\n    \"express\": \"^4.21.0\"\n  }\n}\nPKGEOF\n\n# start.sh\ncat > /mnt/server/start.sh << 'STARTEOF'\n#!/bin/bash\ncd /home/container\n\nif [ ! -d \"node_modules\" ] || [ \"package.json\" -nt \"node_modules\" ]; then\n    echo \"[NPM] Installation des dependances...\"\n    npm install --no-audit --no-fund --omit=dev 2>&1 | tail -10\nfi\n\nexec node server.js\nSTARTEOF\n\nchmod +x /mnt/server/start.sh\necho \"[INSTALL] Termine. Depose ton site dans public/ (et optionnellement routes.js pour des API).\"\n",
+            "container": "debian:bookworm-slim",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": []
+}
