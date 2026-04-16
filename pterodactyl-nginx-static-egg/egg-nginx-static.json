@@ -1,0 +1,31 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-04-14T21:40:00+00:00",
+    "name": "Nginx Static",
+    "author": "Tyson2Lazzz",
+    "description": "Heberge un site statique HTML/CSS/JS avec nginx compile (zero dependance runtime). Port pris automatiquement depuis l'allocation. Le SSL et le blocage IP se gerent cote VPS via reverse proxy + iptables.",
+    "features": null,
+    "docker_images": {
+        "Debian": "ghcr.io/parkervcp/yolks:debian"
+    },
+    "file_denylist": [],
+    "startup": "bash /home/container/start.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\r\n    \"done\": \"[Nginx] Demarrage sur le port\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\nset -e\napt-get update\napt-get install -y --no-install-recommends \\\n    build-essential wget tar ca-certificates libssl-dev zlib1g-dev\n\ncd /tmp\nwget -q https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.tar.gz\ntar xzf pcre-8.45.tar.gz\n\nwget -q https://nginx.org/download/nginx-1.26.1.tar.gz\ntar xzf nginx-1.26.1.tar.gz\ncd nginx-1.26.1\n\n./configure \\\n    --prefix=/tmp/ngx_prefix \\\n    --sbin-path=/home/container/bin/nginx \\\n    --conf-path=/tmp/ngx_prefix/conf/nginx.conf \\\n    --error-log-path=/home/container/logs/error.log \\\n    --http-log-path=/home/container/logs/access.log \\\n    --pid-path=/tmp/nginx.pid \\\n    --lock-path=/tmp/nginx.lock \\\n    --http-client-body-temp-path=/tmp/ngx/client \\\n    --http-proxy-temp-path=/tmp/ngx/proxy \\\n    --with-pcre=/tmp/pcre-8.45 \\\n    --without-http_fastcgi_module \\\n    --without-http_uwsgi_module \\\n    --without-http_scgi_module \\\n    --with-http_gzip_static_module\n\nmake -j$(nproc)\nmkdir -p /mnt/server/bin /mnt/server/logs /mnt/server/webroot\ncp objs/nginx /mnt/server/bin/nginx\ncp conf/mime.types /mnt/server/bin/mime.types\n\ncat > /mnt/server/webroot/index.html << 'HTMLEOF'\n<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Nginx Static - Pret</title>\n    <style>\n        body { font-family: sans-serif; background: #1a1a2e; color: #eee; text-align: center; padding: 80px; }\n        h1 { color: #00ff88; }\n        code { background: #16213e; padding: 4px 10px; border-radius: 4px; color: #00ff88; }\n    </style>\n</head>\n<body>\n    <h1>Nginx Static - Pret</h1>\n    <p>Depose tes fichiers dans <code>webroot/</code></p>\n</body>\n</html>\nHTMLEOF\n\ncat > /mnt/server/start.sh << 'STARTEOF'\n#!/bin/bash\nPORT=${SERVER_PORT:-80}\n\nmkdir -p /tmp/ngx/client /tmp/ngx/proxy /home/container/logs\n\ncat > /tmp/nginx.conf << NGINXEOF\nworker_processes 1;\npid /tmp/nginx.pid;\nerror_log /home/container/logs/error.log warn;\n\nevents { worker_connections 512; }\n\nhttp {\n    include /home/container/bin/mime.types;\n    default_type application/octet-stream;\n\n    client_body_temp_path /tmp/ngx/client;\n    proxy_temp_path       /tmp/ngx/proxy;\n\n    access_log /home/container/logs/access.log;\n    sendfile on;\n    keepalive_timeout 65;\n    gzip on;\n    gzip_types text/plain text/css application/javascript application/json image/svg+xml;\n\n    server {\n        listen __PORT__;\n        root /home/container/webroot;\n        index index.html;\n\n        location / { try_files \\$uri \\$uri/ =404; }\n\n        location ~* \\.(css|js|png|jpg|jpeg|gif|ico|svg|woff2|ttf|eot|webp)\\$ {\n            expires 30d;\n            add_header Cache-Control \"public, immutable\";\n        }\n    }\n}\nNGINXEOF\n\nsed -i \"s|__PORT__|${PORT}|g\" /tmp/nginx.conf\n\necho \"[Nginx] Demarrage sur le port ${PORT}\"\nexec /home/container/bin/nginx -c /tmp/nginx.conf -g 'daemon off;'\nSTARTEOF\n\nchmod +x /mnt/server/start.sh\necho \"[INSTALL] Termine. Depose tes fichiers dans webroot/\"\n",
+            "container": "debian:bookworm-slim",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": []
+}
